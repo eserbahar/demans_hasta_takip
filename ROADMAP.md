@@ -24,6 +24,23 @@ Neden:
 
 ## 3. İşlevsel plan
 
+### 3.0 Kullanıcı profilleri ve roller
+
+Bu uygulama üç ana kullanıcı tipine sahip olmalıdır:
+
+- Hasta
+- Bakıcı
+- Doktor
+
+Her rol farklı iş akışına ve veri erişimine sahip olmalıdır.
+
+| Rol | Ana görev | Importance | Complexity |
+|---|---|---:|---:|
+| Hasta | Kendi profiline bakar, günlük durumunu görür, takip verilerini okur | 4 | 2 |
+| Bakıcı | Günlük bakım, ilaç, sıvı, idrar girişleri yapar | 5 | 3 |
+| Doktor | Hasta takibini izler, raporları inceler, öneri / düzenleme yapar | 5 | 3 |
+| Admin | Tüm erişimi ve yetkilendirmeyi yönetir | 4 | 3 |
+
 ### 3.1 Hasta yönetimi
 
 | Başlık | Açıklama | Importance | Complexity |
@@ -33,6 +50,7 @@ Neden:
 | Hasta ekleme/düzenleme | Profilin güncellenmesi ve silinmesi | 5 | 2 |
 | Acil iletişim bilgileri | Acil durum telefonu, bakım veren bilgileri | 5 | 2 |
 | Hasta durumu etiketleri | Aktif, izlemde, riskli, tamamlandı | 3 | 2 |
+| Hasta erişimi yönetimi | Her rolün hangi hastaya erişebileceği | 5 | 4 |
 
 ### 3.2 İlaç takibi
 
@@ -44,6 +62,8 @@ Neden:
 | İlaç hatırlatıcı | Bildirim ve alarm | 5 | 4 |
 | İlaç kullanım geçmişi | Geçmiş verilişler ve tarihler | 4 | 2 |
 | İlaç iptali / düzeltme | Yanlış girişin düzeltilmesi | 4 | 2 |
+| Bakıcı tarafından işaretleme | Bakıcı günlük ilaç girişlerini tamamlar | 5 | 2 |
+| Doktor onayı / değerlendirmesi | Doktor ilaç planını inceler | 4 | 3 |
 
 ### 3.3 Sıvı ve boşaltım takibi
 
@@ -65,6 +85,8 @@ Neden:
 | Acil durum notları | Hızlı müdahale için özel durumlar | 5 | 3 |
 | Görüşme / ziyaret notları | Bakım görevlileri tarafından yazılır | 3 | 2 |
 | Rutin ve özel bakım akışı | Özel bakım adımları | 4 | 3 |
+| Hasta özeti | Hasta kendi bakım özetini görür | 3 | 2 |
+| Doktor görünümü | Doktor günlük notları ve bakım değişikliklerini inceler | 4 | 3 |
 
 ### 3.5 Raporlama ve analitik
 
@@ -81,10 +103,12 @@ Neden:
 | Başlık | Açıklama | Importance | Complexity |
 |---|---|---:|---:|
 | Kullanıcı girişi | Email / şifre veya OAuth | 5 | 3 |
-| Rol bazlı erişim | Bakım görevlisi / yönetici / doktor | 5 | 4 |
+| Rol bazlı erişim | Hasta / bakıcı / doktor / admin | 5 | 4 |
 | Veri güvenliği | Kişisel sağlık verilerinin korunması | 5 | 4 |
 | Erişim loglaması | Kim ne zaman erişti | 4 | 3 |
 | Şifreleme | Veriler sunucuda şifrelenmeli | 5 | 3 |
+| Hasta erişim izni | Her hasta için kullanıcı-atama sistemi | 5 | 4 |
+| Doktor ve bakıcı ayrımı | Rollere göre farklı ekran ve yetki mantığı | 5 | 3 |
 
 ## 4. Teknik plan
 
@@ -141,17 +165,32 @@ lib/
 
 ### 4.3 Veri modeli önerisi
 
-#### patients
+#### profiles
 - id
 - full_name
+- role (patient / caregiver / doctor / admin)
+- phone
+- email
+- created_at
+
+#### patients
+- id
+- owner_id
+- full_name
 - birth_date
-- age
 - medical_conditions
 - emergency_contact
 - caregiver_name
 - notes
 - created_at
 - updated_at
+
+#### patient_access
+- id
+- patient_id
+- user_id
+- role
+- granted_at
 
 #### medications
 - id
@@ -196,12 +235,13 @@ lib/
 
 | Başlık | Açıklama | Importance | Complexity |
 |---|---|---:|---:|
-| RLS politikaları | Kullanıcı sadece kendi hasta verisine erişebilir | 5 | 4 |
+| RLS politikaları | Kullanıcı sadece erişimi olan hastaların verisine bakar | 5 | 4 |
 | JWT token güvenliği | Yetkilendirme ve session yönetimi | 5 | 3 |
 | Veritabanı şifreleme | Hassas veri koruması | 5 | 3 |
 | API güvenlik | HTTPS zorunlu | 5 | 2 |
 | Loglama | Erişim ve değişiklik izleme | 4 | 3 |
 | Yedekleme | Otomatik veri yedekleme düzeni | 4 | 3 |
+| Rol ayrımı | Hasta, bakıcı ve doktor için farklı yetkiler | 5 | 3 |
 
 ### 4.5 Notification / alarm sistemi
 
@@ -226,13 +266,15 @@ lib/
 ### Ay 1 – Temel veri ve kullanıcı akışı
 - Supabase kurulumu
 - Auth kurulumu
-- Hasta profil modeli ve tablo yapısı
+- profiles ve rol yapısı
+- patients + patient_access modeli
 - Hasta ekleme / düzenleme ekranları
+- Bakıcı ve doktor erişim akışı
 - Temel veri servisleri
 - İlk testler
 
 Importance toplam: 5 / 5
-Complexity: 3 / 5
+Complexity: 4 / 5
 
 ### Ay 2 – Takip akışı ve bakım ekranı
 - İlaç takibi ve log sistemi
@@ -240,6 +282,7 @@ Complexity: 3 / 5
 - Günlük bakım notları
 - Hedef ayarları
 - Uyarı sistemi
+- Bakıcı ve doktor için farklı ekran akışları
 - UI ve state yönetimi iyileştirme
 
 Importance toplam: 5 / 5
@@ -248,7 +291,7 @@ Complexity: 4 / 5
 ### Ay 3 – Raporlama, güvenlik ve release hazırlığı
 - Haftalık / aylık raporlar
 - Grafikler ve istatistikler
-- Rol tabanlı erişim
+- Hasta, bakıcı ve doktor rolleri için izin doğrulama
 - Güvenlik ve loglama
 - Bildirimler
 - App store / play store hazırlığı
@@ -260,12 +303,13 @@ Complexity: 4 / 5
 ## 6. Öncelik sırası
 
 1. Kullanıcı güvenliği ve veri koruma
-2. Hasta profili ve veri modeli
-3. İlaç ve bakım takibi
-4. Sıvı / idrar takibi
-5. Raporlama ve grafikler
-6. Bildirimler ve alarm sistemi
-7. Release ve production hazırlığı
+2. Kullanıcı rolleri ve hasta erişim yönetimi
+3. Hasta profili ve veri modeli
+4. İlaç ve bakım takibi
+5. Sıvı / idrar takibi
+6. Raporlama ve grafikler
+7. Bildirimler ve alarm sistemi
+8. Release ve production hazırlığı
 
 ## 7. Son karar
 
@@ -274,5 +318,6 @@ En doğru yaklaşım şu şekildedir:
 - SQLite opsiyonel olarak kullanılabilir ama ana veri kayna değil
 - Supabase önerilen platform
 - güvenlik ve erişim kontrolü ilk aşamada öncelikli olmalı
+- kullanıcı profilleri ayrı modellenmeli: hasta, bakıcı ve doktor
 
 Bu plan, uygulanabilir ve güvenli bir hasta bakım takip sistemi kurmak için gerekli temel yapıyı verir.
