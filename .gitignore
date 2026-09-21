@@ -1,0 +1,38 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub-spec.yaml
+build/
+
+# IntelliJ/Android Studio
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# Android
+android/.gradle/
+android/local.properties
+android/**/build/
+android/key.properties
+
+# iOS/macOS
+ios/Pods/
+ios/Flutter/Generated.xcconfig
+ios/Runner.xcworkspace/
+macos/Pods/
+macos/Flutter/Generated.xcconfig
+
+# Web
+web/**/node_modules/
+
+# Windows
+windows/flutter/generated_plugin_registrant.*
+
+# General
+*.log
