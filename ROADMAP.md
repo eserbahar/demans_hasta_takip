@@ -263,15 +263,38 @@ lib/
 
 ## 5. 3 ay roadmap
 
+### Uygulama durumu
+
+Tamamlanan temel işler:
+
+- Supabase projesi oluşturuldu ve Flutter bağlantısı doğrulandı.
+- `supabase_flutter` bağımlılığı eklendi.
+- Supabase Auth ile giriş ekranı ve oturum kontrolü eklendi.
+- `profiles` sorgusu ile bağlantı ve profil erişimi doğrulandı.
+- Giriş sonrası hasta listesi ekranı oluşturuldu.
+- Hasta seçme ve hasta değiştirme akışı oluşturuldu.
+- Hasta ekleme formu `patients` tablosuna bağlandı.
+- Hasta oluşturana otomatik `patient_access` kaydı ekleniyor.
+- İlaçlar seçilen hastaya göre yükleniyor ve Supabase'e kaydediliyor.
+- İlaç veriliş ve iptal işlemleri `medication_logs` tablosuna yazılıyor.
+- Sıvı ve idrar girişleri merkezi veritabanına kaydediliyor.
+- Günlük sıvı, idrar ve ilaç logları dashboard açılışında yükleniyor.
+
+Importance: 5 / 5
+Complexity: 4 / 5
+
 ### Ay 1 – Temel veri ve kullanıcı akışı
-- Supabase kurulumu
-- Auth kurulumu
+- Supabase kurulumu ve bağlantı
+- Auth kurulumu ve giriş ekranı
 - profiles ve rol yapısı
 - patients + patient_access modeli
-- Hasta ekleme / düzenleme ekranları
+- Hasta listesi, seçim ve hasta ekleme ekranları
+- İlaç, sıvı ve idrar verilerinin Supabase'e bağlanması
 - Bakıcı ve doktor erişim akışı
 - Temel veri servisleri
 - İlk testler
+
+Durum: Temel veri ve kullanıcı akışının büyük bölümü tamamlandı.
 
 Importance toplam: 5 / 5
 Complexity: 4 / 5
@@ -321,3 +344,12 @@ En doğru yaklaşım şu şekildedir:
 - kullanıcı profilleri ayrı modellenmeli: hasta, bakıcı ve doktor
 
 Bu plan, uygulanabilir ve güvenli bir hasta bakım takip sistemi kurmak için gerekli temel yapıyı verir.
+
+## 8. Bir Sonraki Teknik Adımlar
+
+1. Günlük notlar için Flutter CRUD ekranı eklemek.
+2. `patient_access` yönetimini doktor/admin akışına bağlamak.
+3. İlaç, sıvı ve idrar kayıtları için servis/repository katmanı çıkarmak.
+4. Supabase RLS testlerini gerçek kullanıcı rolleriyle doğrulamak.
+5. Widget, unit ve integration testleri eklemek.
+6. Bildirim ve raporlama özelliklerine geçmek.

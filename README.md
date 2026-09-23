@@ -4,7 +4,7 @@ Bu proje, demans hastası için günlük bakım, ilaç takibi ve sıvı/idrara i
 
 ## Proje Hakkında
 
-Uygulama şu an için tek ekranlı bir bakım takibi kontrol paneli olarak çalışmaktadır. Hasta profili, ilaç takibi, günlük sıvı hedefleri, idrar takibi ve aktivite logları gibi temel işlevleri içermektedir.
+Uygulama; hasta, bakıcı ve doktor rollerini destekleyecek şekilde geliştirilen, merkezi Supabase veritabanı kullanan bir demans bakım takip uygulamasıdır. Kullanıcı girişinden sonra yetkili hastalar listelenir; seçilen hastaya ait bakım dashboard'u açılır.
 
 ## Yapılanlar
 
@@ -17,6 +17,14 @@ Uygulama şu an için tek ekranlı bir bakım takibi kontrol paneli olarak çal�
 - Uyarı ve hedef aşımı gösterimi
 - Aktivite/işlem geçmişi kaydı
 - Flutter Material 3 tasarım dili kullanımı
+- Supabase Auth ile e-posta/şifre girişi
+- Supabase PostgreSQL bağlantısı ve RLS tabanlı erişim
+- Hasta listesi, hasta seçimi ve hasta değiştirme akışı
+- Hasta ekleme ve otomatik `patient_access` kaydı
+- İlaçların seçilen hastaya göre Supabase'ten yüklenmesi
+- İlaç ekleme ve ilaç veriliş/iptal loglarının merkezi kaydı
+- Sıvı ve idrar kayıtlarının seçilen `patient_id` ile saklanması
+- Günlük sıvı, idrar ve ilaç durumlarının veritabanından geri yüklenmesi
 
 ## Özellikler
 
@@ -45,6 +53,9 @@ Uygulama şu an için tek ekranlı bir bakım takibi kontrol paneli olarak çal�
 - Flutter
 - Dart
 - Material 3
+- Supabase Auth
+- Supabase PostgreSQL
+- Supabase Row Level Security (RLS)
 
 ## Çalıştırma
 
@@ -52,8 +63,10 @@ Proje klasöründe aşağıdaki komutları çalıştırın:
 
 ```bash
 flutter pub get
-flutter run
+flutter run --dart-define="SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co" --dart-define="SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY"
 ```
+
+`SUPABASE_PUBLISHABLE_KEY` mobil/web istemcide kullanılabilir anahtardır. `service_role` anahtarını uygulamaya eklemeyin. Gerçek anahtarları README, Git veya sohbet kayıtlarına yazmayın.
 
 ## Geliştirme Ortamı
 
@@ -70,13 +83,26 @@ Projeyi yerel olarak çalıştırmak için aşağıdakiler gereklidir:
 lib/
   main.dart
 
+supabase/
+  migrations/
+    001_initial_schema.sql
+
 test/
   widget_test.dart
 ```
 
-## Durum
+## Mevcut Durum
 
-Bu sürüm bir işlevsel prototype olarak hazırdır. Uygulama, bakım takibi için temel ekran ve iş akışlarını kapsamaktadır; ileri safhalarda ek ekranlar, veri kaydı, bildirimler ve kişiselleştirilmiş raporlar eklenebilir.
+İlk Supabase entegrasyonu çalışır durumdadır. Auth, profil sorgusu, yetkili hasta listesi, hasta ekleme, ilaç kayıtları, ilaç logları, sıvı ve idrar kayıtları merkezi veritabanına bağlanmıştır. SQL şeması ve RLS politikaları [supabase/migrations/001_initial_schema.sql](supabase/migrations/001_initial_schema.sql) dosyasındadır.
+
+Henüz tamamlanmamış başlıca konular:
+
+- Günlük notların Flutter ekranına bağlanması
+- Doktor/bakıcı rolüne göre ayrı yetki ve ekranlar
+- Hasta erişimi yönetim ekranı
+- Haftalık/aylık raporlar ve grafikler
+- Bildirimler ve üretim güvenliği kontrolleri
+- Uygulama kodunun `main.dart` dışındaki feature klasörlerine ayrılması
 
 ## Lisans
 
