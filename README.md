@@ -68,6 +68,23 @@ flutter run --dart-define="SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co" --
 
 `SUPABASE_PUBLISHABLE_KEY` mobil/web istemcide kullanılabilir anahtardır. `service_role` anahtarını uygulamaya eklemeyin. Gerçek anahtarları README, Git veya sohbet kayıtlarına yazmayın.
 
+## GitHub Pages
+
+`main` dalına yapılan her push, [deploy-pages.yml](.github/workflows/deploy-pages.yml) workflow'u ile Flutter Web sürümünü GitHub Pages'e deploy eder.
+
+GitHub repository settings içinde **Settings → Secrets and variables → Actions → Variables** bölümüne şu iki repository variable'ı ekleyin:
+
+- `SUPABASE_URL`
+- `SUPABASE_PUBLISHABLE_KEY`
+
+İlk deployment'tan önce **Settings → Pages → Source** değerini **GitHub Actions** olarak seçin. Proje URL'si:
+
+```text
+https://eserbahar.github.io/demans_hasta_takip/
+```
+
+Supabase Auth kullanıldığı için bu domaini Supabase Authentication URL Configuration bölümündeki redirect allow list'e ekleyin.
+
 ## Geliştirme Ortamı
 
 Projeyi yerel olarak çalıştırmak için aşağıdakiler gereklidir:
