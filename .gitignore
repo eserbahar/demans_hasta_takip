@@ -1,5 +1,6 @@
 # Flutter/Dart
 .dart_tool/
+.flutter-plugins-dependencies
 .packages
 .pub-cache/
 .pub-spec.yaml
@@ -36,3 +37,6 @@ windows/flutter/generated_plugin_registrant.*
 
 # General
 *.log
+
+# Supabase local development
+supabase/.temp/

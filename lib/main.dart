@@ -1,6 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-void main() {
+const supabaseUrl = String.fromEnvironment(
+  'SUPABASE_URL',
+  defaultValue: 'https://YOUR_PROJECT_REF.supabase.co',
+);
+
+const supabasePublishableKey = String.fromEnvironment(
+  'SUPABASE_PUBLISHABLE_KEY',
+  defaultValue: 'YOUR_PUBLISHABLE_KEY',
+);
+
+final supabase = Supabase.instance.client;
+String supabaseConnectionStatus = 'Kontrol ediliyor...';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: supabaseUrl,
+    publishableKey: supabasePublishableKey,
+  );
+
   runApp(const Demans1App());
 }
 
@@ -21,7 +42,139 @@ class Demans1App extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const DashboardScreen(),
+      home: const AuthGate(),
+    );
+  }
+}
+
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<AuthState>(
+      stream: supabase.auth.onAuthStateChange,
+      builder: (context, snapshot) {
+        if (supabase.auth.currentSession == null) {
+          return const LoginScreen();
+        }
+        return const PatientSelectionScreen();
+      },
+    );
+  }
+}
+
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _signIn() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      setState(() => _errorMessage = 'E-posta ve şifre zorunludur.');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await supabase.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+    } on AuthException catch (error) {
+      if (mounted) {
+        setState(() => _errorMessage = error.message);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Card(
+            margin: const EdgeInsets.all(24),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Icon(Icons.health_and_safety, size: 48, color: Color(0xFF0288D1)),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Demans Hasta Takip',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 24),
+                  TextField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'E-posta',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _passwordController,
+                    obscureText: true,
+                    onSubmitted: (_) => _signIn(),
+                    decoration: const InputDecoration(
+                      labelText: 'Şifre',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  if (_errorMessage != null) ...[
+                    const SizedBox(height: 12),
+                    Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
+                  ],
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: _isLoading ? null : _signIn,
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Giriş Yap'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -46,6 +199,33 @@ class PatientProfile {
       calculatedAge--;
     }
     return calculatedAge;
+  }
+}
+
+class RemotePatient {
+  final String id;
+  final String fullName;
+  final DateTime? birthDate;
+  final List<String> medicalConditions;
+
+  const RemotePatient({
+    required this.id,
+    required this.fullName,
+    required this.birthDate,
+    required this.medicalConditions,
+  });
+
+  factory RemotePatient.fromMap(Map<String, dynamic> map) {
+    return RemotePatient(
+      id: map['id'] as String,
+      fullName: map['full_name'] as String,
+      birthDate: map['birth_date'] == null
+          ? null
+          : DateTime.tryParse(map['birth_date'] as String),
+      medicalConditions: (map['medical_conditions'] as List<dynamic>? ?? [])
+          .map((condition) => condition.toString())
+          .toList(),
+    );
   }
 }
 
@@ -85,8 +265,240 @@ class ActivityLog {
   });
 }
 
+class PatientSelectionScreen extends StatefulWidget {
+  const PatientSelectionScreen({super.key});
+
+  @override
+  State<PatientSelectionScreen> createState() => _PatientSelectionScreenState();
+}
+
+class _PatientSelectionScreenState extends State<PatientSelectionScreen> {
+  List<RemotePatient> _patients = [];
+  String? _errorMessage;
+  bool _isLoading = true;
+
+  void _showAddPatientDialog() {
+    final nameController = TextEditingController();
+    final birthDateController = TextEditingController();
+    final conditionsController = TextEditingController();
+    String? errorMessage;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Hasta Ekle'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Ad soyad',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: birthDateController,
+                      keyboardType: TextInputType.datetime,
+                      decoration: const InputDecoration(
+                        labelText: 'Doğum tarihi (YYYY-AA-GG)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: conditionsController,
+                      decoration: const InputDecoration(
+                        labelText: 'Rahatsızlıklar (virgülle ayırın)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    if (errorMessage != null) ...[
+                      const SizedBox(height: 12),
+                      Text(errorMessage!, style: const TextStyle(color: Colors.red)),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('İptal'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final name = nameController.text.trim();
+                    final birthDateText = birthDateController.text.trim();
+                    final birthDate = birthDateText.isEmpty
+                        ? null
+                        : DateTime.tryParse(birthDateText);
+
+                    if (name.isEmpty) {
+                      setDialogState(() => errorMessage = 'Ad soyad zorunludur.');
+                      return;
+                    }
+                    if (birthDateText.isNotEmpty && birthDate == null) {
+                      setDialogState(() => errorMessage = 'Doğum tarihi YYYY-AA-GG olmalı.');
+                      return;
+                    }
+
+                    try {
+                      final userId = supabase.auth.currentUser!.id;
+                      final profile = await supabase
+                          .from('profiles')
+                          .select('role')
+                          .eq('id', userId)
+                          .single();
+                      final patient = await supabase.from('patients').insert({
+                        'full_name': name,
+                        'birth_date': birthDate?.toIso8601String().split('T').first,
+                        'medical_conditions': conditionsController.text
+                            .split(',')
+                            .map((condition) => condition.trim())
+                            .where((condition) => condition.isNotEmpty)
+                            .toList(),
+                        'created_by': userId,
+                      }).select('id').single();
+                      await supabase.from('patient_access').insert({
+                        'patient_id': patient['id'],
+                        'user_id': userId,
+                        'role': profile['role'],
+                        'granted_by': userId,
+                      });
+                      if (!dialogContext.mounted) return;
+                      Navigator.pop(dialogContext);
+                      await _loadPatients();
+                    } on PostgrestException catch (error) {
+                      if (dialogContext.mounted) {
+                        setDialogState(() => errorMessage = error.message);
+                      }
+                    }
+                  },
+                  child: const Text('Kaydet'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    ).then((_) {
+      nameController.dispose();
+      birthDateController.dispose();
+      conditionsController.dispose();
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPatients();
+  }
+
+  Future<void> _loadPatients() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final rows = await supabase
+          .from('patients')
+          .select('id, full_name, birth_date, medical_conditions')
+          .order('full_name');
+      if (mounted) {
+        setState(() {
+          _patients = rows.map((row) => RemotePatient.fromMap(row)).toList();
+          _isLoading = false;
+        });
+      }
+    } on PostgrestException catch (error) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = error.message;
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _selectPatient(RemotePatient patient) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DashboardScreen(selectedPatient: patient),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Hasta Seçimi'),
+        actions: [
+          IconButton(
+            tooltip: 'Hasta ekle',
+            onPressed: _showAddPatientDialog,
+            icon: const Icon(Icons.person_add),
+          ),
+          IconButton(
+            tooltip: 'Yenile',
+            onPressed: _loadPatients,
+            icon: const Icon(Icons.refresh),
+          ),
+          IconButton(
+            tooltip: 'Çıkış yap',
+            onPressed: () => supabase.auth.signOut(),
+            icon: const Icon(Icons.logout),
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+              ? Center(child: Text('Hastalar yüklenemedi: $_errorMessage'))
+              : _patients.isEmpty
+                  ? const Center(
+                      child: Text('Bu kullanıcıya atanmış hasta bulunmuyor.'),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _patients.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final patient = _patients[index];
+                        return Card(
+                          child: ListTile(
+                            leading: const CircleAvatar(
+                              child: Icon(Icons.person),
+                            ),
+                            title: Text(
+                              patient.fullName,
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            subtitle: Text(
+                              patient.birthDate == null
+                                  ? 'Doğum tarihi belirtilmedi'
+                                  : 'Doğum: ${patient.birthDate!.day}.${patient.birthDate!.month}.${patient.birthDate!.year}',
+                            ),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => _selectPatient(patient),
+                          ),
+                        );
+                      },
+                    ),
+    );
+  }
+}
+
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final RemotePatient? selectedPatient;
+
+  const DashboardScreen({super.key, this.selectedPatient});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -95,12 +507,141 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    final selectedPatient = widget.selectedPatient;
+    _patient = PatientProfile(
+      name: selectedPatient?.fullName ?? 'Ayşe Turan',
+      birthDate: selectedPatient?.birthDate ?? DateTime(1948, 5, 14),
+      medicalConditions: selectedPatient?.medicalConditions ??
+          ['Alzheimer / Demans', 'Hipertansiyon'],
+    );
+    _loadProfileConnectionStatus();
+    _loadMedications().then((_) => _loadDailyTracking());
+  }
+
+  Future<void> _loadMedications() async {
+    final patientId = widget.selectedPatient?.id;
+    if (patientId == null) return;
+
+    try {
+      final rows = await supabase
+          .from('medications')
+          .select('id, name, dosage, time_slot, scheduled_time')
+          .eq('patient_id', patientId)
+          .eq('is_active', true)
+          .order('scheduled_time');
+      if (mounted) {
+        setState(() {
+          _medications = rows.map((row) {
+            final scheduledTime = row['scheduled_time'] as String;
+            return Medication(
+              id: row['id'] as String,
+              name: row['name'] as String,
+              dosage: row['dosage'] as String,
+              timeSlot: row['time_slot'] as String,
+              plannedTime: scheduledTime.substring(0, 5),
+            );
+          }).toList();
+        });
+      }
+    } on PostgrestException catch (error) {
+      debugPrint('İlaçlar yüklenemedi: ${error.message}');
+    }
+  }
+
+  Future<void> _loadDailyTracking() async {
+    final patientId = widget.selectedPatient?.id;
+    if (patientId == null) return;
+
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day).toUtc().toIso8601String();
+    final startOfTomorrow = DateTime(now.year, now.month, now.day + 1)
+        .toUtc()
+        .toIso8601String();
+
+    try {
+      final fluidRows = await supabase
+          .from('fluid_entries')
+          .select('amount_ml')
+          .eq('patient_id', patientId)
+          .gte('logged_at', startOfDay)
+          .lt('logged_at', startOfTomorrow);
+      final urineRows = await supabase
+          .from('urine_entries')
+          .select('amount_ml, status, logged_at')
+          .eq('patient_id', patientId)
+          .gte('logged_at', startOfDay)
+          .lt('logged_at', startOfTomorrow)
+          .order('logged_at', ascending: false);
+      final medicationRows = await supabase
+          .from('medication_logs')
+          .select('medication_id, status, logged_at')
+          .eq('patient_id', patientId)
+          .gte('logged_at', startOfDay)
+          .lt('logged_at', startOfTomorrow)
+          .order('logged_at', ascending: false);
+
+      final fluidTotal = fluidRows.fold<int>(
+        0,
+        (total, row) => total + (row['amount_ml'] as int),
+      );
+      final urineTotal = urineRows.fold<int>(
+        0,
+        (total, row) => total + (row['amount_ml'] as int),
+      );
+      final latestUrine = urineRows.isEmpty ? null : urineRows.first;
+      final takenMedicationIds = medicationRows
+          .where((row) => row['status'] == 'taken')
+          .map((row) => row['medication_id'] as String)
+          .toSet();
+
+      if (mounted) {
+        setState(() {
+          _currentFluidMl = fluidTotal;
+          _currentUrineMl = urineTotal;
+          _showFluidWarning = fluidTotal == 0;
+          if (latestUrine != null) {
+            final loggedAt = DateTime.parse(latestUrine['logged_at'] as String)
+                .toLocal();
+            _lastUrineTime =
+                '${loggedAt.hour.toString().padLeft(2, '0')}:${loggedAt.minute.toString().padLeft(2, '0')} (${latestUrine['status']})';
+          }
+          for (final medication in _medications) {
+            medication.isTaken = takenMedicationIds.contains(medication.id);
+          }
+        });
+      }
+    } on PostgrestException catch (error) {
+      debugPrint('Günlük takip verileri yüklenemedi: ${error.message}');
+    }
+  }
+
+  Future<void> _loadProfileConnectionStatus() async {
+    try {
+      final profiles = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', supabase.auth.currentUser!.id)
+          .limit(1);
+      if (mounted) {
+        setState(() {
+          supabaseConnectionStatus =
+              'Bağlantı başarılı: ${profiles.length} profil bulundu.';
+        });
+      }
+    } on PostgrestException catch (error) {
+      if (mounted) {
+        setState(() {
+          supabaseConnectionStatus = 'Bağlantı hatası: ${error.message}';
+        });
+      }
+    }
+  }
+
   // 👤 Hasta Profil Bilgileri
-  final PatientProfile _patient = PatientProfile(
-    name: 'Ayşe Turan',
-    birthDate: DateTime(1948, 5, 14),
-    medicalConditions: ['Alzheimer / Demans', 'Hipertansiyon'],
-  );
+  late PatientProfile _patient;
 
   int _targetFluidMl = 2000;
   int _targetUrineMl = 1500;
@@ -110,33 +651,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _lastUrineTime = '10:15 (Normal)';
   bool _showFluidWarning = true;
 
-  final List<Medication> _medications = [
-    Medication(
-      id: 'med1',
-      name: 'Donepezil',
-      dosage: '10mg',
-      timeSlot: 'Sabah',
-      plannedTime: '08:00',
-      isTaken: true,
-      takenTime: '08:00',
-    ),
-    Medication(
-      id: 'med2',
-      name: 'Memantin',
-      dosage: '10mg',
-      timeSlot: 'Öğle',
-      plannedTime: '13:00',
-      isTaken: false,
-    ),
-    Medication(
-      id: 'med3',
-      name: 'Tansiyon İlacı',
-      dosage: '5mg',
-      timeSlot: 'Akşam',
-      plannedTime: '20:00',
-      isTaken: false,
-    ),
-  ];
+  List<Medication> _medications = [];
 
   final List<ActivityLog> _logs = [
     ActivityLog(
@@ -349,16 +864,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  void _toggleMedication(Medication med) {
+  Future<void> _toggleMedication(Medication med) async {
     final now = TimeOfDay.now();
     final formattedTime = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
     if (!med.isTaken) {
-      setState(() {
-        med.isTaken = true;
-        med.takenTime = formattedTime;
-        _addLog('${med.name} ${med.dosage} İlacı Verildi', 'medication', Colors.green, Icons.medication);
-      });
+      final patientId = widget.selectedPatient?.id;
+      if (patientId == null) return;
+      try {
+        await supabase.from('medication_logs').insert({
+          'patient_id': patientId,
+          'medication_id': med.id,
+          'status': 'taken',
+          'logged_at': DateTime.now().toUtc().toIso8601String(),
+          'logged_by': supabase.auth.currentUser!.id,
+        });
+        if (mounted) {
+          setState(() {
+            med.isTaken = true;
+            med.takenTime = formattedTime;
+            _addLog('${med.name} ${med.dosage} İlacı Verildi', 'medication', Colors.green, Icons.medication);
+          });
+        }
+      } on PostgrestException catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(error.message)),
+          );
+        }
+      }
     } else {
       showDialog(
         context: context,
@@ -381,15 +915,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                onPressed: () {
-                  setState(() {
-                    med.isTaken = false;
-                    med.takenTime = null;
-                    _logs.removeWhere((log) => 
-                      log.category == 'medication' && log.title.contains(med.name)
-                    );
-                  });
-                  Navigator.pop(dialogCtx);
+                onPressed: () async {
+                  final patientId = widget.selectedPatient?.id;
+                  if (patientId == null) return;
+                  try {
+                    await supabase.from('medication_logs').insert({
+                      'patient_id': patientId,
+                      'medication_id': med.id,
+                      'status': 'cancelled',
+                      'logged_at': DateTime.now().toUtc().toIso8601String(),
+                      'logged_by': supabase.auth.currentUser!.id,
+                    });
+                    if (!dialogCtx.mounted) return;
+                    setState(() {
+                      med.isTaken = false;
+                      med.takenTime = null;
+                      _logs.removeWhere((log) =>
+                          log.category == 'medication' && log.title.contains(med.name));
+                    });
+                    Navigator.pop(dialogCtx);
+                  } on PostgrestException catch (error) {
+                    if (dialogCtx.mounted) {
+                      ScaffoldMessenger.of(dialogCtx).showSnackBar(
+                        SnackBar(content: Text(error.message)),
+                      );
+                    }
+                  }
                 },
                 child: const Text('Evet, İptal Et'),
               ),
@@ -603,22 +1154,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           const SizedBox(width: 8),
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0288D1), foregroundColor: Colors.white),
-                            onPressed: () {
-                              if (nameController.text.trim().isNotEmpty) {
-                                setState(() {
-                                  _medications.add(
-                                    Medication(
-                                      id: DateTime.now().millisecondsSinceEpoch.toString(),
-                                      name: nameController.text.trim(),
-                                      dosage: dosageController.text.trim().isEmpty ? '1 Doz' : dosageController.text.trim(),
-                                      timeSlot: selectedTimeSlot,
-                                      plannedTime: timeController.text.trim().isEmpty ? '09:00' : timeController.text.trim(),
-                                    ),
-                                  );
+                            onPressed: () async {
+                              final patientId = widget.selectedPatient?.id;
+                              final name = nameController.text.trim();
+                              final dosage = dosageController.text.trim().isEmpty
+                                  ? '1 Doz'
+                                  : dosageController.text.trim();
+                              final plannedTime = timeController.text.trim().isEmpty
+                                  ? '09:00'
+                                  : timeController.text.trim();
+
+                              if (patientId == null || name.isEmpty) return;
+                              try {
+                                await supabase.from('medications').insert({
+                                  'patient_id': patientId,
+                                  'name': name,
+                                  'dosage': dosage,
+                                  'time_slot': selectedTimeSlot,
+                                  'scheduled_time': plannedTime,
+                                  'created_by': supabase.auth.currentUser!.id,
                                 });
-                                nameController.clear();
-                                dosageController.clear();
-                                setDialogState(() {});
+                                await _loadMedications();
+                                if (dialogCtx.mounted) {
+                                  nameController.clear();
+                                  dosageController.clear();
+                                  setDialogState(() {});
+                                }
+                              } on PostgrestException catch (error) {
+                                if (dialogCtx.mounted) {
+                                  ScaffoldMessenger.of(dialogCtx).showSnackBar(
+                                    SnackBar(content: Text(error.message)),
+                                  );
+                                }
                               }
                             },
                             child: const Text('İlacı Kaydet'),
@@ -634,6 +1201,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
       },
     );
+  }
+
+  Future<void> _insertFluidEntry(int amount, String type) async {
+    final patientId = widget.selectedPatient?.id;
+    if (patientId == null) return;
+    await supabase.from('fluid_entries').insert({
+      'patient_id': patientId,
+      'amount_ml': amount,
+      'type': type,
+      'logged_by': supabase.auth.currentUser!.id,
+    });
+  }
+
+  Future<void> _insertUrineEntry(int amount, String status) async {
+    final patientId = widget.selectedPatient?.id;
+    if (patientId == null) return;
+    await supabase.from('urine_entries').insert({
+      'patient_id': patientId,
+      'amount_ml': amount,
+      'status': status,
+      'logged_by': supabase.auth.currentUser!.id,
+    });
   }
 
   void _showFluidAddDialog([BuildContext? sheetContext]) {
@@ -721,17 +1310,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
-                  onPressed: () {
+                  onPressed: () async {
                     final int? amount = int.tryParse(amountController.text);
                     if (amount != null && amount > 0) {
-                      setState(() {
-                        _currentFluidMl += amount;
-                        _showFluidWarning = false;
-                      });
-                      _addLog('+$amount ml $selectedDrink İçildi', 'fluid', Colors.blue, Icons.water_drop);
-                      Navigator.pop(dialogCtx);
-                      if (sheetContext != null) {
-                        Navigator.pop(sheetContext);
+                      try {
+                        await _insertFluidEntry(amount, selectedDrink);
+                        if (!dialogCtx.mounted) return;
+                        setState(() {
+                          _currentFluidMl += amount;
+                          _showFluidWarning = false;
+                        });
+                        _addLog('+$amount ml $selectedDrink İçildi', 'fluid', Colors.blue, Icons.water_drop);
+                        Navigator.pop(dialogCtx);
+                        if (sheetContext != null && sheetContext.mounted) {
+                          Navigator.pop(sheetContext);
+                        }
+                      } on PostgrestException catch (error) {
+                        if (dialogCtx.mounted) {
+                          ScaffoldMessenger.of(dialogCtx).showSnackBar(
+                            SnackBar(content: Text(error.message)),
+                          );
+                        }
                       }
                     }
                   },
@@ -853,7 +1452,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
-                  onPressed: () {
+                  onPressed: () async {
                     final int? amount = int.tryParse(amountController.text);
                     if (amount == null || amount <= 0) {
                       setDialogState(() {
@@ -867,14 +1466,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     
                     final String title = 'İdrar Çıkışı ($selectedStatus) - $amount ml';
 
-                    setState(() {
-                      _currentUrineMl += amount;
-                      _lastUrineTime = '$formattedTime ($selectedStatus)';
-                    });
-                    _addLog(title, 'toilet', Colors.orange, Icons.wc);
-                    
-                    Navigator.pop(dialogCtx);
-                    Navigator.pop(sheetContext);
+                    try {
+                      await _insertUrineEntry(amount, selectedStatus);
+                      if (!dialogCtx.mounted) return;
+                      setState(() {
+                        _currentUrineMl += amount;
+                        _lastUrineTime = '$formattedTime ($selectedStatus)';
+                      });
+                      _addLog(title, 'toilet', Colors.orange, Icons.wc);
+
+                      Navigator.pop(dialogCtx);
+                      if (sheetContext.mounted) {
+                        Navigator.pop(sheetContext);
+                      }
+                    } on PostgrestException catch (error) {
+                      if (dialogCtx.mounted) {
+                        setDialogState(() => errorMessage = error.message);
+                      }
+                    }
                   },
                   child: const Text('Ekle'),
                 ),
@@ -969,13 +1578,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     icon: Icons.local_drink,
                     label: '+200 ml Su',
                     color: Colors.blue,
-                    onTap: () {
-                      setState(() {
-                        _currentFluidMl += 200;
-                        _showFluidWarning = false;
-                      });
-                      _addLog('+200 ml Su İçildi', 'fluid', Colors.blue, Icons.water_drop);
-                      Navigator.pop(ctx);
+                    onTap: () async {
+                      try {
+                        await _insertFluidEntry(200, 'Su');
+                        if (!ctx.mounted) return;
+                        setState(() {
+                          _currentFluidMl += 200;
+                          _showFluidWarning = false;
+                        });
+                        _addLog('+200 ml Su İçildi', 'fluid', Colors.blue, Icons.water_drop);
+                        Navigator.pop(ctx);
+                      } on PostgrestException catch (error) {
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(content: Text(error.message)),
+                          );
+                        }
+                      }
                     },
                   ),
                   _buildQuickActionButton(
@@ -1044,6 +1663,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Card(
+            color: supabaseConnectionStatus.startsWith('Bağlantı başarılı')
+                ? Colors.green.shade50
+                : Colors.orange.shade50,
+            child: ListTile(
+              leading: Icon(
+                supabaseConnectionStatus.startsWith('Bağlantı başarılı')
+                    ? Icons.cloud_done
+                    : Icons.cloud_off,
+                color: supabaseConnectionStatus.startsWith('Bağlantı başarılı')
+                    ? Colors.green
+                    : Colors.orange,
+              ),
+              title: const Text('Supabase bağlantısı'),
+              subtitle: Text(supabaseConnectionStatus),
+            ),
+          ),
           if (_showFluidWarning)
             Card(
               color: const Color(0xFFFFEBEE),
@@ -1426,6 +2062,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.people, color: Color(0xFF0288D1)),
+            tooltip: 'Hasta değiştir',
+            onPressed: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const PatientSelectionScreen(),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.account_circle, size: 28, color: Color(0xFF0288D1)),
             tooltip: 'Hasta Profili',
