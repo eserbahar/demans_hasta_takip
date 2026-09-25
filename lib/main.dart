@@ -207,12 +207,18 @@ class RemotePatient {
   final String fullName;
   final DateTime? birthDate;
   final List<String> medicalConditions;
+  final String? emergencyContact;
+  final String? caregiverName;
+  final String? notes;
 
   const RemotePatient({
     required this.id,
     required this.fullName,
     required this.birthDate,
     required this.medicalConditions,
+    this.emergencyContact,
+    this.caregiverName,
+    this.notes,
   });
 
   factory RemotePatient.fromMap(Map<String, dynamic> map) {
@@ -225,6 +231,9 @@ class RemotePatient {
       medicalConditions: (map['medical_conditions'] as List<dynamic>? ?? [])
           .map((condition) => condition.toString())
           .toList(),
+      emergencyContact: map['emergency_contact'] as String?,
+      caregiverName: map['caregiver_name'] as String?,
+      notes: map['notes'] as String?,
     );
   }
 }
@@ -281,6 +290,9 @@ class _PatientSelectionScreenState extends State<PatientSelectionScreen> {
     final nameController = TextEditingController();
     final birthDateController = TextEditingController();
     final conditionsController = TextEditingController();
+    final emergencyContactController = TextEditingController();
+    final caregiverNameController = TextEditingController();
+    final notesController = TextEditingController();
     String? errorMessage;
 
     showDialog(
@@ -316,6 +328,33 @@ class _PatientSelectionScreenState extends State<PatientSelectionScreen> {
                       decoration: const InputDecoration(
                         labelText: 'Rahatsızlıklar (virgülle ayırın)',
                         border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: emergencyContactController,
+                      keyboardType: TextInputType.phone,
+                      decoration: const InputDecoration(
+                        labelText: 'Acil iletişim (ad ve telefon)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: caregiverNameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Bakıcı adı',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: notesController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Notlar',
+                        border: OutlineInputBorder(),
+                        alignLabelWithHint: true,
                       ),
                     ),
                     if (errorMessage != null) ...[
@@ -354,6 +393,9 @@ class _PatientSelectionScreenState extends State<PatientSelectionScreen> {
                           .select('role')
                           .eq('id', userId)
                           .single();
+                      final emergencyContact = emergencyContactController.text.trim();
+                      final caregiverName = caregiverNameController.text.trim();
+                      final notes = notesController.text.trim();
                       final patient = await supabase.from('patients').insert({
                         'full_name': name,
                         'birth_date': birthDate?.toIso8601String().split('T').first,
@@ -362,6 +404,9 @@ class _PatientSelectionScreenState extends State<PatientSelectionScreen> {
                             .map((condition) => condition.trim())
                             .where((condition) => condition.isNotEmpty)
                             .toList(),
+                        'emergency_contact': emergencyContact.isEmpty ? null : emergencyContact,
+                        'caregiver_name': caregiverName.isEmpty ? null : caregiverName,
+                        'notes': notes.isEmpty ? null : notes,
                         'created_by': userId,
                       }).select('id').single();
                       await supabase.from('patient_access').insert({
@@ -390,6 +435,9 @@ class _PatientSelectionScreenState extends State<PatientSelectionScreen> {
       nameController.dispose();
       birthDateController.dispose();
       conditionsController.dispose();
+      emergencyContactController.dispose();
+      caregiverNameController.dispose();
+      notesController.dispose();
     });
   }
 
@@ -407,7 +455,9 @@ class _PatientSelectionScreenState extends State<PatientSelectionScreen> {
     try {
       final rows = await supabase
           .from('patients')
-          .select('id, full_name, birth_date, medical_conditions')
+          .select(
+            'id, full_name, birth_date, medical_conditions, emergency_contact, caregiver_name, notes',
+          )
           .order('full_name');
       if (mounted) {
         setState(() {
@@ -481,9 +531,14 @@ class _PatientSelectionScreenState extends State<PatientSelectionScreen> {
                               style: const TextStyle(fontWeight: FontWeight.bold),
                             ),
                             subtitle: Text(
-                              patient.birthDate == null
-                                  ? 'Doğum tarihi belirtilmedi'
-                                  : 'Doğum: ${patient.birthDate!.day}.${patient.birthDate!.month}.${patient.birthDate!.year}',
+                              [
+                                patient.birthDate == null
+                                    ? 'Doğum tarihi belirtilmedi'
+                                    : 'Doğum: ${patient.birthDate!.day}.${patient.birthDate!.month}.${patient.birthDate!.year}',
+                                if (patient.caregiverName != null &&
+                                    patient.caregiverName!.isNotEmpty)
+                                  'Bakıcı: ${patient.caregiverName}',
+                              ].join(' • '),
                             ),
                             trailing: const Icon(Icons.chevron_right),
                             onTap: () => _selectPatient(patient),

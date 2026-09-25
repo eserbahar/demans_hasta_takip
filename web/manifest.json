@@ -1,11 +1,11 @@
 {
-    "name": "demans_1",
-    "short_name": "demans_1",
+    "name": "Demans Hasta Takip",
+    "short_name": "Demans Takip",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Demans hastası için ilaç, sıvı ve idrar takibi uygulaması.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

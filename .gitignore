@@ -40,3 +40,9 @@ windows/flutter/generated_plugin_registrant.*
 
 # Supabase local development
 supabase/.temp/
+
+# Local secrets (Supabase keys etc.) - never commit
+.env
+.env.*
+env.json
+*.secrets.json
