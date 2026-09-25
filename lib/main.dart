@@ -31,7 +31,7 @@ class Demans1App extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Demans 1 - Bakım Takip',
+      title: 'Demans Hasta Takip',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         scaffoldBackgroundColor: const Color(0xFFF5F7FA),
