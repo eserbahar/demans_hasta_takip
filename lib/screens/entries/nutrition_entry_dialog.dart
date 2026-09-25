@@ -1,0 +1,151 @@
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../config/activity_categories.dart';
+import '../../main.dart' show supabase;
+import '../../widgets/star_rating.dart';
+
+/// Beslenme (Nutrition) entry dialog.
+/// Fields: star rating + meal-type dropdown + portion quick-chips + notes.
+/// *(exact UI TBD from user per the implementation plan — placeholder.)*
+Future<void> showNutritionEntryDialog(
+  BuildContext context, {
+  required String patientId,
+  required VoidCallback onSaved,
+}) async {
+  const descriptor = ActivityCategoryDescriptor(
+    id: ActivityCategoryId.nutrition,
+    label: 'Beslenme',
+    icon: Icons.restaurant,
+    color: Color(0xFFC97B4A),
+    tint: Color(0xFFFBF0E8),
+    tableName: 'nutrition_entries',
+  );
+
+  int rating = 3;
+  String mealType = 'Kahvaltı';
+  final mealTypes = ['Kahvaltı', 'Öğle', 'Akşam', 'Ara Öğün'];
+  int? portionPercent;
+  final notesController = TextEditingController();
+  String? errorMessage;
+
+  await showDialog(
+    context: context,
+    builder: (dialogCtx) {
+      return StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: Row(
+              children: [
+                Icon(descriptor.icon, color: descriptor.color),
+                const SizedBox(width: 8),
+                const Text('Beslenme Girişi', style: TextStyle(fontSize: 18)),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Nasıl geçti?',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
+                  const SizedBox(height: 4),
+                  StarRatingInput(
+                    value: rating,
+                    color: descriptor.color,
+                    onChanged: (value) => setDialogState(() => rating = value),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Öğün:',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade400),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: mealType,
+                        isExpanded: true,
+                        items: mealTypes
+                            .map((type) => DropdownMenuItem(value: type, child: Text(type)))
+                            .toList(),
+                        onChanged: (value) {
+                          if (value != null) setDialogState(() => mealType = value);
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Porsiyon:',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [25, 50, 75, 100].map((percent) {
+                      final selected = portionPercent == percent;
+                      return ChoiceChip(
+                        label: Text('%$percent'),
+                        selected: selected,
+                        selectedColor: descriptor.color.withValues(alpha: 0.2),
+                        onSelected: (_) => setDialogState(() => portionPercent = percent),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: notesController,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: 'Notlar (opsiyonel)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  if (errorMessage != null) ...[
+                    const SizedBox(height: 12),
+                    Text(errorMessage!, style: const TextStyle(color: Colors.red)),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx),
+                child: const Text('İptal'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: descriptor.color,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () async {
+                  try {
+                    await supabase.from('nutrition_entries').insert({
+                      'patient_id': patientId,
+                      'rating': rating,
+                      'meal_type': mealType,
+                      'portion_percent': portionPercent,
+                      'notes': notesController.text.trim().isEmpty
+                          ? null
+                          : notesController.text.trim(),
+                      'logged_by': supabase.auth.currentUser!.id,
+                    });
+                    if (!dialogCtx.mounted) return;
+                    Navigator.pop(dialogCtx);
+                    onSaved();
+                  } on PostgrestException catch (error) {
+                    setDialogState(() => errorMessage = error.message);
+                  }
+                },
+                child: const Text('Kaydet'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+  notesController.dispose();
+}

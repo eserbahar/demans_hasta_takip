@@ -27,13 +27,14 @@ flutter run `
 
 ## Veritabanı
 
-Migration dosyası:
+Migration dosyaları:
 
 ```text
 supabase/migrations/001_initial_schema.sql
+supabase/migrations/002_activity_tracking.sql
 ```
 
-Oluşturulan tablolar:
+`001` ile oluşturulan tablolar:
 
 - `profiles`
 - `patients`
@@ -55,6 +56,16 @@ Oluşturulan tablolar:
 - RLS politikaları
 - authenticated rolü için tablo izinleri
 
+`002` ile eklenenler (9 kategorili günlük takip için, **ek/additive** — hiçbir mevcut tablo/veri değiştirilmedi/silinmedi):
+
+- Yeni enum: `activity_category` (`physical`, `mental`, `social`)
+- Mevcut `medication_logs`, `fluid_entries`, `urine_entries` tablolarına `rating smallint` kolonu (1-5, nullable)
+- Yeni tablolar: `nutrition_entries`, `bowel_entries`, `activity_entries` (Fiziksel/Zihinsel/Sosyal ortak, `category` kolonuyla ayrılır), `vitals_entries` (sıcaklık/nabız/tansiyon, en az biri zorunlu — `vitals_entries_has_a_value` check constraint'i)
+- Her yeni tablo `001`'deki `has_patient_access(patient_id)` + tek `for all` RLS policy deseniyle korunur; `logged_by = auth.uid()` kontrolü `with check`'te
+- `<tablo>_patient_logged_at_idx` indeks deseni korunur
+- Migration sonunda `grant select, insert, update, delete on all tables in schema public to authenticated;` tekrar çalıştırılır (001'deki gibi, `alter default privileges` kullanılmadığı için gerekli)
+- Bu migration Supabase SQL Editor üzerinden elle çalıştırıldı (proje `supabase link` ile bağlı değil, CLI ile push edilmedi)
+
 ## Tamamlanan Flutter akışı
 
 1. Uygulama Supabase'i başlatır.
@@ -62,47 +73,55 @@ Oluşturulan tablolar:
 3. Oturum yoksa login ekranı gösterilir.
 4. Oturum varsa hasta seçim ekranı açılır.
 5. Yetkili hastalar `patients` tablosundan listelenir.
-6. Hasta ekleme seçim ekranındaki butondan yapılır.
+6. Hasta ekleme seçim ekranındaki butondan yapılır (ad, doğum tarihi, kronik durumlar, acil iletişim, bakıcı adı, notlar).
 7. Hasta eklenince `patient_access` kaydı otomatik oluşturulur.
-8. Hasta seçilince dashboard açılır.
-9. Dashboard başlığındaki hasta değiştir düğmesi listeye döner.
-10. Seçilen hastanın ilaçları yüklenir.
-11. İlaç ekleme, ilaç verilmesi ve iptali Supabase'e yazılır.
-12. Sıvı ve idrar girişleri seçilen `patient_id` ile Supabase'e yazılır.
-13. Günlük sıvı, idrar ve ilaç logları dashboard açılışında yüklenir.
+8. Hasta seçilince **"Bugünü Kaydet"** ekranı açılır (eski "dashboard"/"Ana Sayfa" ekranının yerini aldı, aynı zamanda ana ekrandır).
+9. Ekranda 9 kategori kutusu (İlaç, Ateş/Nabız/Tansiyon, Beslenme, Sıvı Alımı, İdrar Çıkışı, Dışkılama, Fiziksel/Zihinsel/Sosyal Aktivite) sabit sırada gösterilir; her kutu o günün durumunu (yıldız + detay veya boş/hatırlatma) canlı olarak Supabase'ten okur.
+10. Kutuya dokununca ilgili kategorinin giriş penceresi açılır; kaydedince ilgili tabloya `insert` yapılır ve grid yeniden yüklenir.
+11. Üst çubuktaki "Geçmiş/Raporlar" ikonu **Günlük** ekranına gider; Günlük ekranı 9 kategoriyi de gerçek Supabase verisiyle (sayfa yenilense de kaybolmadan) listeler.
+12. "PDF dışa aktar" ve "Doktorla paylaş" ikonları şimdilik "Yakında" snackbar'ı gösterir, gerçek işlev yok.
 
 ## Önemli uygulama notları
 
-- `main.dart` şu anda çok sayıda modeli, ekranı ve Supabase işlemini içeriyor; ileride feature-based klasörlere ayrılmalı.
-- Dashboard yalnızca seçilen hastanın bakım verilerini göstermelidir.
+- `main.dart` artık yalnızca bootstrap/tema/Auth gate/login içeriyor; kod `lib/config`, `lib/models`, `lib/widgets`, `lib/screens`, `lib/screens/entries` klasörlerine bölündü (feature-based yapı).
+- 9 kategorinin giriş formu alanları (`nutrition_entry_dialog.dart` vb.) **taslak/placeholder** — kesinleşmiş tasarım değil, kullanıcı ayrıca belirleyecek.
+- İlaç kutusu artık tek bir ilaç yerine bekleyen/verilmiş ilaçları listeleyen bir "hub" penceresi açıyor (birden fazla ilaç tek kutuda temsil edildiği için).
+- Eski Ana Sayfa'daki sıvı/idrar hedef ayarı, ilerleme çubukları, "SIVI ALARMI" banner'ı ve hasta profili düzenleme penceresi bu tasarımda **kaldırıldı** (kullanıcı onayıyla, şimdilik gerekli değil).
+- Bakıcı yalnızca seçilen hastanın bakım verilerini görmelidir.
 - Hasta listesi ve erişim kapsamı RLS tarafından sınırlandırılmalıdır.
-- Her kayıt `patient_id` ve işlemi yapan kullanıcı ID'si ile ilişkilendirilmelidir.
+- Her kayıt `patient_id` ve işlemi yapan kullanıcı ID'si (`logged_by`) ile ilişkilendirilmelidir.
 - Sağlık verileri nedeniyle RLS kapatılmamalıdır.
 - Veritabanı sorguları başarısız olduğunda local state başarı gibi güncellenmemelidir.
+- `GridView` içindeki kategori kutularının `childAspectRatio` değeri yeterince küçük tutulmalı (şu an `0.56`); aksi halde kutu içeriği (ikon+etiket+yıldız+hatırlatma metni) üst üste biner — bu hata bu oturumda bulunup düzeltildi, benzer bir grid eklenirse tekrar dikkat edilmeli.
 
 ## Doğrulama
 
 Çalıştırılmış kontroller:
 
 ```powershell
-dart analyze lib/main.dart
-git diff --check
+flutter analyze lib
+flutter build web --dart-define="SUPABASE_URL=..." --dart-define="SUPABASE_PUBLISHABLE_KEY=..."
 ```
 
-Dart analizinde yeni derleme hatası yoktur; mevcut Flutter/Dart API deprecation uyarıları bulunmaktadır.
+`flutter analyze lib`: yeni hata/uyarı yok, yalnızca 1 önceden var olan `unnecessary_underscores` info uyarısı (`patient_selection_screen.dart`, orijinal koddan taşınmış). `flutter build web` başarılı.
 
 Supabase endpoint bağlantısı ve `profiles` sorgusu gerçek projede doğrulanmıştır. `1 profil bulundu` sonucu Auth oturumu ve RLS ile profil erişiminin çalıştığını göstermiştir.
 
+9 kategorinin `insert`/okuma kodu, `002_activity_tracking.sql`'deki kolon adları ve tipleriyle birebir eşleşecek şekilde kod incelemesiyle doğrulandı (`nutrition_entries`, `bowel_entries`, `activity_entries`, `vitals_entries`). Tarayıcı üzerinden canlı tıklama testi otomasyon aracının koordinat/ölçek tutarsızlığı nedeniyle tamamlanamadı; kod incelemesi yeterli görüldü.
+
 ## Sıradaki işler
 
+- 9 kategorinin giriş formu alanlarını kesinleştirmek
+- Raporlar ekranı
+- PDF dışa aktarma ve doktorla paylaşma özellikleri
+- Eski sıvı/idrar hedef ayarı, ilerleme çubukları, uyarı banner'ı ve hasta profili düzenlemenin bu tasarımda nereye/nasıl geri ekleneceği
 - `daily_notes` için CRUD ekranı
 - doktor/bakıcı rol bazlı ekran ve izinler
 - hasta erişim yönetimi
-- veritabanı servis/repository katmanı
 - günlük ve haftalık raporlar
 - bildirimler
 - widget/integration testleri
-- Supabase CLI + Docker ile migration lint doğrulaması
+- Supabase CLI + Docker ile migration lint doğrulaması (proje şu an `supabase link` ile bağlı değil, migration'lar SQL Editor'den elle çalıştırılıyor)
 
 ## Güvenlik uyarısı
 

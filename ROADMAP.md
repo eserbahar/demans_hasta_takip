@@ -279,6 +279,10 @@ Tamamlanan temel işler:
 - İlaç veriliş ve iptal işlemleri `medication_logs` tablosuna yazılıyor.
 - Sıvı ve idrar girişleri merkezi veritabanına kaydediliyor.
 - Günlük sıvı, idrar ve ilaç logları dashboard açılışında yükleniyor.
+- **Uygulama 9 kategorili günlük takip modeline göre yeniden tasarlandı**: İlaç, Beslenme, Sıvı Alımı, İdrar Çıkışı, Dışkılama, Fiziksel/Zihinsel/Sosyal Aktivite, Ateş/Nabız/Tansiyon — hepsi 1-5 yıldız + not ile kaydediliyor (detay için bkz. Bölüm 9).
+- "Bugünü Kaydet" ekranı ana/karşılama ekranı oldu; ayrı bir "Ana Sayfa" sekmesi ve alt gezinme çubuğu kaldırıldı.
+- `lib/main.dart` feature-bazlı klasörlere ayrıldı (`lib/config`, `lib/models`, `lib/widgets`, `lib/screens`, `lib/screens/entries`).
+- `supabase/migrations/002_activity_tracking.sql` ile 4 yeni tablo (`nutrition_entries`, `bowel_entries`, `activity_entries`, `vitals_entries`) ve mevcut 3 tabloya (`medication_logs`, `fluid_entries`, `urine_entries`) `rating` kolonu eklendi.
 
 Importance: 5 / 5
 Complexity: 4 / 5
@@ -347,9 +351,24 @@ Bu plan, uygulanabilir ve güvenli bir hasta bakım takip sistemi kurmak için g
 
 ## 8. Bir Sonraki Teknik Adımlar
 
-1. Günlük notlar için Flutter CRUD ekranı eklemek.
-2. `patient_access` yönetimini doktor/admin akışına bağlamak.
-3. İlaç, sıvı ve idrar kayıtları için servis/repository katmanı çıkarmak.
-4. Supabase RLS testlerini gerçek kullanıcı rolleriyle doğrulamak.
-5. Widget, unit ve integration testleri eklemek.
-6. Bildirim ve raporlama özelliklerine geçmek.
+1. 9 kategorinin giriş formu alanlarını kesinleştirmek (şu anki alanlar taslak/placeholder).
+2. Raporlar ekranını tasarlamak ve üst çubuktaki "Geçmiş/Raporlar" ikonunu buna bağlamak.
+3. PDF dışa aktarma ve "Doktorla paylaş" özelliklerini gerçek işlevle bağlamak.
+4. Eski sıvı/idrar hedef ayarı, ilerleme çubukları, "SIVI ALARMI" uyarısı ve hasta profili düzenleme ekranının bu tasarımda nasıl (ve nereye) geri ekleneceğine karar vermek.
+5. Günlük notlar için Flutter CRUD ekranı eklemek.
+6. `patient_access` yönetimini doktor/admin akışına bağlamak.
+7. Supabase RLS testlerini gerçek kullanıcı rolleriyle doğrulamak — özellikle 4 yeni tablo (`nutrition_entries`, `bowel_entries`, `activity_entries`, `vitals_entries`).
+8. Widget, unit ve integration testleri eklemek.
+9. Bildirim özelliklerine geçmek.
+
+## 9. 9 Kategorili Günlük Takip Yeniden Tasarımı
+
+Bakıcıların günlük bakımı tek bir tutarlı akışla kaydetmesi için uygulama yeniden tasarlandı:
+
+- **Kategoriler**: İlaç, Beslenme, Sıvı Alımı, İdrar Çıkışı, Dışkılama, Fiziksel Aktivite, Zihinsel Aktivite, Sosyal Aktivite, Ateş/Nabız/Tansiyon.
+- **Puanlama**: Her kategori 1-5 yıldız ile "ne kadar iyi geçti" şeklinde puanlanır (5 = çok iyi, 1 = reddetti/çok kötü). Vital bulgular da dahil tüm kategoriler yıldız alır; İlaç/Sıvı/İdrar ayrıca kendi klinik alanlarını (doz durumu, ml, idrar durumu) korumaya devam eder — yıldız ve not bunlara ek olarak eklenmiştir, mevcut veriler kaybolmamıştır.
+- **"Bugünü Kaydet" ekranı**: Hasta seçildikten sonra açılan tek ana ekran. 3x3'lük kategori grid'i (sabit sıra: İlaç, Ateş/Nabız/Tansiyon, Beslenme / Sıvı Alımı, İdrar Çıkışı, Dışkılama / Fiziksel, Zihinsel, Sosyal Aktivite), her kutu o gün kayıt yoksa boş+hatırlatma metni, kayıt varsa dolu yıldız+detay gösterir. Kutuya dokununca ilgili kategori giriş penceresi açılır.
+- **Zaman damgası/sıfırlama**: Her kayıt gerçek `logged_at` zaman damgası taşır, hiçbir kayıt silinmez/üzerine yazılmaz. "Bugün" durumu salt okunur bir tarih filtresidir — gece yarısı otomatik olarak sıfırlanmış görünür, ayrı bir sıfırlama mantığı yoktur.
+- **Alt gezinme çubuğu kaldırıldı**: Eski "Ana Sayfa / Günlük / Ekle / Raporlar" sekmeleri yerine üst çubukta 3 ikon (Geçmiş/Raporlar, PDF dışa aktar, Doktorla paylaş) var; bu ikonlar şimdilik büyük ölçüde yer tutucu.
+- **Görsel tasarım**: Sıcak krem arka plan (`#F6F2EA`), koyu ada yeşili vurgu rengi (`#2F6F5E`), Fraunces (başlık) + Figtree (gövde) yazı tipleri, her kategori için ayrı bir vurgu rengi. Tasarım önce bir HTML mockup (Artifact) üzerinde kullanıcıyla birlikte defalarca yinelenip onaylandı, sonra gerçek Flutter koduna geçirildi.
+- **Bilinçli kapsam dışı bırakmalar**: Eski Ana Sayfa'daki sıvı/idrar hedef ayarı, ilerleme çubukları, "SIVI ALARMI" banner'ı ve hasta profili düzenleme penceresinin bu tasarımda karşılığı yok; ayrı bir takip konusu olarak bekliyor. Raporlar ekranı de henüz yapılmadı.
