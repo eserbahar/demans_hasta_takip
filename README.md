@@ -6,6 +6,8 @@ Bu proje, demans hastası için günlük bakım takibini kolaylaştırmak amacı
 
 Uygulama; hasta, bakıcı ve doktor rollerini destekleyecek şekilde geliştirilen, merkezi Supabase veritabanı kullanan bir demans bakım takip uygulamasıdır. Kullanıcı girişinden sonra yetkili hastalar listelenir; seçilen hasta için **"Bugünü Kaydet"** ekranı açılır — bu ekran aynı zamanda uygulamanın ana/karşılama ekranıdır.
 
+Görsel tasarım kararları (renk paleti, fontlar, kategori ikon/renk eşlemesi, onaylanan mockup linki) için bkz. [DESIGN.md](DESIGN.md). Teknik geliştirme geçmişi ve devam eden bir geliştiricinin bilmesi gerekenler için bkz. [HISTORY.md](HISTORY.md). Ürün planı ve öncelik sırası için bkz. [ROADMAP.md](ROADMAP.md).
+
 ## Yapılanlar
 
 - Hasta profili: ad, doğum tarihi, yaş, kronik durumlar, acil iletişim, bakıcı adı, notlar

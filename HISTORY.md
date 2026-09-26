@@ -65,6 +65,7 @@ supabase/migrations/002_activity_tracking.sql
 - `<tablo>_patient_logged_at_idx` indeks deseni korunur
 - Migration sonunda `grant select, insert, update, delete on all tables in schema public to authenticated;` tekrar çalıştırılır (001'deki gibi, `alter default privileges` kullanılmadığı için gerekli)
 - Bu migration Supabase SQL Editor üzerinden elle çalıştırıldı (proje `supabase link` ile bağlı değil, CLI ile push edilmedi)
+- **`002` gerçek Supabase projesinde başarıyla uygulandı** (kullanıcı tarafından SQL Editor'den çalıştırıldı ve doğrulandı) — 4 yeni tablo ve 3 yeni `rating` kolonu artık production'da mevcut.
 
 ## Tamamlanan Flutter akışı
 
@@ -92,7 +93,9 @@ supabase/migrations/002_activity_tracking.sql
 - Her kayıt `patient_id` ve işlemi yapan kullanıcı ID'si (`logged_by`) ile ilişkilendirilmelidir.
 - Sağlık verileri nedeniyle RLS kapatılmamalıdır.
 - Veritabanı sorguları başarısız olduğunda local state başarı gibi güncellenmemelidir.
-- `GridView` içindeki kategori kutularının `childAspectRatio` değeri yeterince küçük tutulmalı (şu an `0.56`); aksi halde kutu içeriği (ikon+etiket+yıldız+hatırlatma metni) üst üste biner — bu hata bu oturumda bulunup düzeltildi, benzer bir grid eklenirse tekrar dikkat edilmeli.
+- `GridView` içindeki kategori kutuları **`childAspectRatio` yerine sabit `mainAxisExtent` (190) kullanır**. `childAspectRatio` kutu yüksekliğini kolon genişliğine göre ölçeklendirdiği için dar telefon ekranlarında içerik (ikon+etiket+yıldız+hatırlatma metni) üst üste biniyor, geniş masaüstü tarayıcılarında ise kutular aşırı uzayıp ekranın altından taşıyordu (kaydırma da kapalıydı). Sabit `mainAxisExtent` + kaydırmaya izin verilmesi bu sınıfın tüm ekran boyutlarında güvenli olmasını sağlar. Benzer bir grid eklenirse `childAspectRatio` yerine `mainAxisExtent` tercih edilmeli.
+- Tüm `AppBar`'lar için `ThemeData.appBarTheme` (cream arka plan + kompakt başlık stili) tanımlanmalı; aksi halde Material 3'ün `colorScheme.surface` varsayılanı (beyaz) AppBar'da görünür kalır ve tasarımdaki krem arka planla uyuşmaz — bu oturumda "Hasta Seçimi" ekranında fark edilip düzeltildi.
+- Tasarım sistemi (renkler, fontlar, kategori ikon/renk eşlemesi, onaylanan mockup linki) [DESIGN.md](DESIGN.md) dosyasında tutulur.
 
 ## Doğrulama
 
@@ -108,6 +111,8 @@ flutter build web --dart-define="SUPABASE_URL=..." --dart-define="SUPABASE_PUBLI
 Supabase endpoint bağlantısı ve `profiles` sorgusu gerçek projede doğrulanmıştır. `1 profil bulundu` sonucu Auth oturumu ve RLS ile profil erişiminin çalıştığını göstermiştir.
 
 9 kategorinin `insert`/okuma kodu, `002_activity_tracking.sql`'deki kolon adları ve tipleriyle birebir eşleşecek şekilde kod incelemesiyle doğrulandı (`nutrition_entries`, `bowel_entries`, `activity_entries`, `vitals_entries`). Tarayıcı üzerinden canlı tıklama testi otomasyon aracının koordinat/ölçek tutarsızlığı nedeniyle tamamlanamadı; kod incelemesi yeterli görüldü.
+
+İlk redesign commit'i (`9acf5bc`) sonrası GitHub Pages'te canlı test edilince iki görsel hata bulundu ve ikinci bir commit'te (`d8da515`) düzeltildi: "Hasta Seçimi" ekranının arka planı beyaz kalıyordu (AppBar tema eksikliği) ve kategori kutuları geniş ekranlarda ekrana sığmıyordu (`childAspectRatio` kırılganlığı). Detaylar için "Önemli uygulama notları" bölümüne bakın.
 
 ## Sıradaki işler
 
