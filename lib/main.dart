@@ -47,6 +47,16 @@ class Demans1App extends StatelessWidget {
           primary: AppColors.primary,
           surface: Colors.white,
         ),
+        appBarTheme: AppBarTheme(
+          backgroundColor: AppColors.background,
+          foregroundColor: AppColors.bodyText,
+          elevation: 0,
+          titleTextStyle: textTheme.titleLarge?.copyWith(
+            fontSize: 19,
+            fontWeight: FontWeight.bold,
+            color: AppColors.bodyText,
+          ),
+        ),
         textTheme: textTheme.copyWith(
           titleLarge: displayFont.titleLarge,
           titleMedium: displayFont.titleMedium,

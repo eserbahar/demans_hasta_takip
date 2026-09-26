@@ -301,6 +301,8 @@ class _JournalScreenState extends State<JournalScreen> {
         foregroundColor: AppColors.bodyText,
         title: Text(
           widget.selectedPatient?.fullName ?? 'Günlük',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.bodyText),
         ),
         actions: [

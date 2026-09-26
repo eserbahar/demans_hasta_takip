@@ -531,16 +531,19 @@ class _LogTodayScreenState extends State<LogTodayScreen> {
                       descriptor.label,
                       textAlign: TextAlign.center,
                       maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 13.5,
                         color: AppColors.bodyText,
+                        height: 1.15,
                       ),
                     ),
                   ],
                 ),
               ),
               Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   StarRatingDisplay(rating: status?.rating, size: 14, color: descriptor.color),
                   const SizedBox(height: 3),
@@ -548,13 +551,22 @@ class _LogTodayScreenState extends State<LogTodayScreen> {
                     Text(
                       (status?.detail?.isNotEmpty ?? false) ? status!.detail! : ' ',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 9.5, color: descriptor.color, fontWeight: FontWeight.bold),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        color: descriptor.color,
+                        fontWeight: FontWeight.bold,
+                        height: 1.15,
+                      ),
                     )
                   else
                     const Text(
                       'Günlük veri girişi yapılmadı',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 9.5, color: AppColors.mutedText),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 9.5, color: AppColors.mutedText, height: 1.15),
                     ),
                 ],
               ),
@@ -578,7 +590,9 @@ class _LogTodayScreenState extends State<LogTodayScreen> {
           children: [
             Text(
               _patient.name,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: AppColors.bodyText,
                   ),
@@ -626,19 +640,16 @@ class _LogTodayScreenState extends State<LogTodayScreen> {
       ),
       body: _isLoadingStatus
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
+          : GridView.builder(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-              child: GridView.builder(
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
-                  childAspectRatio: 0.56,
-                ),
-                itemCount: activityCategories.length,
-                itemBuilder: (context, index) => _buildCategoryTile(activityCategories[index]),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                mainAxisExtent: 190,
               ),
+              itemCount: activityCategories.length,
+              itemBuilder: (context, index) => _buildCategoryTile(activityCategories[index]),
             ),
     );
   }
